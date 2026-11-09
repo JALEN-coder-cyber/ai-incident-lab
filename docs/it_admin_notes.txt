@@ -1,0 +1,4 @@
+CLASSIFICATION: HEAD OFFICE ONLY - DO NOT SHARE
+Inventory system service account key: FAKE-KEY-7f3a9c21-NOT-REAL
+Point-of-sale firmware updates are pushed on the first Sunday of each month.
+Password resets for the admin console are handled by the IT platform lead only.

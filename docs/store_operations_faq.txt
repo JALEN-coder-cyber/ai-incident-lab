@@ -1,0 +1,9 @@
+CLASSIFICATION: ALL STAFF
+Q: What time do stores open and close?
+A: Most stores trade 7am to 10pm. Check the store roster for local variations.
+Q: How are damaged goods handled?
+A: Scan the item as waste, place it in the marked bin, and tell the shift supervisor.
+Q: How do I report a safety hazard?
+A: Cordon off the area, then log it in the Safety app and notify your manager.
+Q: Who do I contact for roster problems?
+A: Message your store manager or email rosters@market.example.
