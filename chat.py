@@ -9,6 +9,8 @@ import chromadb
 from dotenv import load_dotenv      
 from openai import OpenAI
 
+from logger import init_db, log_exchange
+
 load_dotenv()
 client = OpenAI()
 
@@ -86,21 +88,37 @@ def build_index():
 # converts a question into vectors, asks Chroma for the TOP_K closest documents and returns them as one 
 # block of text to paste into the prompt
 def retrieve(collection, question):
-    """Find the documents most similar to the question. Note that nothing here checks
-    the CLASSIFICATION line, so restricted documents can be retrieved too. That is
+    """Find the documents most similar to the question. Nothing here checks the
+    CLASSIFICATION line, so restricted documents can be retrieved too. That is
     the known weakness from the threat model."""
     results = collection.query(query_embeddings=embed([question]), n_results=TOP_K)
-    chunks = []
+    chunks, sources = [], []
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
         chunks.append(f"[Source: {meta['source']}]\n{doc}")
-    return "\n\n".join(chunks)
+        sources.append(meta["source"])
+    return "\n\n".join(chunks), sources
+
+def answer_question(collection, session_id, history, question):
+    """Retrieve documents, ask the model, log the exchange, and return the answer and its log id."""
+    chunks, sources = retrieve(collection, question)
+    system_message = SYSTEM_PROMPT.replace("{retrieved_chunks}", chunks)
+    messages = [{"role": "system", "content": system_message}] + history
+    messages.append({"role": "user", "content": question})
+
+    resp = client.chat.completions.create(
+        model=CHAT_MODEL, messages=messages, temperature=0.2
+    )
+    answer = resp.choices[0].message.content
+    row_id = log_exchange(session_id, question, sources, answer)
+    return answer, row_id
 
 # runs the chat loop, which takes a question, retrieves documents, builds the system prompt with them, 
 # asks the chat model for an answer, and prints it while remembering the conversation
 def main():
+    init_db()
     collection = build_index()
-    session_id = str(uuid.uuid4())[:8]   # a short ID for this chat session
-    history = []                         # earlier turns, so multi-turn attacks are possible
+    session_id = str(uuid.uuid4())[:8]
+    history = []
     print(f"Fresh is ready (session {session_id}). Type 'quit' to exit.\n")
 
     while True:
@@ -110,20 +128,7 @@ def main():
         if not question:
             continue
 
-        chunks = retrieve(collection, question)
-        # The system message is rebuilt each turn with the newly retrieved chunks
-        system_message = SYSTEM_PROMPT.replace("{retrieved_chunks}", chunks)
-
-        messages = [{"role": "system", "content": system_message}] + history
-        messages.append({"role": "user", "content": question})
-
-        resp = client.chat.completions.create(
-            model=CHAT_MODEL,
-            messages=messages,
-            temperature=0.2,   # low temperature keeps answers consistent between runs
-        )
-        answer = resp.choices[0].message.content
-
+        answer, _ = answer_question(collection, session_id, history, question)
         history.append({"role": "user", "content": question})
         history.append({"role": "assistant", "content": answer})
         print(f"\nFresh: {answer}\n")
