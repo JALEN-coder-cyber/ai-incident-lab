@@ -46,6 +46,8 @@ if question:
     with st.chat_message("user"):
         st.markdown(question)
 
+    # this is the same function that is in chat.py, it is called here so they both have the same behaviour and
+    # log the same information to SQLite
     answer, _ = answer_question(
         collection, st.session_state.session_id, st.session_state.history, question
     )

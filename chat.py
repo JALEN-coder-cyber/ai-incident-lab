@@ -59,14 +59,11 @@ DOCUMENTS:
 
 # sends text to OpenAIs embedding model and returns one list of 1536 numbers for each chunk
 def embed(texts):
-    """Send a list of texts to OpenAI and get back one vector per text."""
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
     return [item.embedding for item in resp.data]
 
 # reads every .txt file in docs/ and converts each one to numbers, and stores them in Chroma so they can be searched
 def build_index():
-    """Read every .txt file in docs/ and store it in Chroma. Rebuilt on each run,
-    so edits to the documents are picked up automatically."""
     chroma = chromadb.PersistentClient(path="chroma_db")
     try:
         chroma.delete_collection("docs")
@@ -88,37 +85,46 @@ def build_index():
 # converts a question into vectors, asks Chroma for the TOP_K closest documents and returns them as one 
 # block of text to paste into the prompt
 def retrieve(collection, question):
-    """Find the documents most similar to the question. Nothing here checks the
-    CLASSIFICATION line, so restricted documents can be retrieved too. That is
-    the known weakness from the threat model."""
+    #finds the documents most similar to the question. Nothing here checks the
+    #CLASSIFICATION line, so restricted documents can be retrieved too. That is
+    #the known weakness from the threat model."""
     results = collection.query(query_embeddings=embed([question]), n_results=TOP_K)
     chunks, sources = [], []
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
         chunks.append(f"[Source: {meta['source']}]\n{doc}")
         sources.append(meta["source"])
+    # returns a block of text for the promp, and a list of sources for the logging
     return "\n\n".join(chunks), sources
 
+# retreives documents and asks the model for an answer. Logs the exchange and returns the answer and its log ig
+# this is called by chat.py and app.py so that the Streamlit UI and the CLI both behave the same and 
+# log the same information
 def answer_question(collection, session_id, history, question):
-    """Retrieve documents, ask the model, log the exchange, and return the answer and its log id."""
+    # 1. finds the closest documents and notes which file it came from
     chunks, sources = retrieve(collection, question)
+    # 2. pastes those documents into the system prompt
     system_message = SYSTEM_PROMPT.replace("{retrieved_chunks}", chunks)
+    # 3. builds a list of messages with system propmt, histroy, and new question, then sends it to the model
     messages = [{"role": "system", "content": system_message}] + history
     messages.append({"role": "user", "content": question})
 
+    # 4. asks the chat model for the answer, the lower the temperature, the more deterministic the response
     resp = client.chat.completions.create(
         model=CHAT_MODEL, messages=messages, temperature=0.2
     )
     answer = resp.choices[0].message.content
+
+    # 5. saves the whole exchange in SQLite
     row_id = log_exchange(session_id, question, sources, answer)
     return answer, row_id
 
 # runs the chat loop, which takes a question, retrieves documents, builds the system prompt with them, 
 # asks the chat model for an answer, and prints it while remembering the conversation
 def main():
-    init_db()
-    collection = build_index()
-    session_id = str(uuid.uuid4())[:8]
-    history = []
+    init_db() # checks to see if the log table exists
+    collection = build_index() # indexes the documents in docs/
+    session_id = str(uuid.uuid4())[:8] # creates a random ID for the chat session
+    history = [] # keeps track of previous questions, for the sake of demonstrating multi-turn attacks on the RAG model
     print(f"Fresh is ready (session {session_id}). Type 'quit' to exit.\n")
 
     while True:
@@ -128,7 +134,9 @@ def main():
         if not question:
             continue
 
+        # _ ignores the row_id for now but is still logged in SQLite
         answer, _ = answer_question(collection, session_id, history, question)
+        # tells the model to remember this for the next question, so it can be used in multi-turn attacks
         history.append({"role": "user", "content": question})
         history.append({"role": "assistant", "content": answer})
         print(f"\nFresh: {answer}\n")
