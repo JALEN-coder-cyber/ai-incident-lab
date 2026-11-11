@@ -9,7 +9,10 @@ import chromadb
 from dotenv import load_dotenv      
 from openai import OpenAI
 
-from logger import init_db, log_exchange
+# these imports are for logging every exchabge to SQLite and for running the two layers of detectors on each exchange
+from logger import init_db, log_exchange, update_flags
+import detect_rules
+import detect_llm
 
 load_dotenv()
 client = OpenAI()
@@ -116,6 +119,12 @@ def answer_question(collection, session_id, history, question):
 
     # 5. saves the whole exchange in SQLite
     row_id = log_exchange(session_id, question, sources, answer)
+
+    # Both detectors run after the answer, so this is monitoring and not prevention:
+    # the user already has the answer by the time anything is flagged
+    rules = detect_rules.check(question, answer)
+    llm = detect_llm.check(question, answer)
+    update_flags(row_id, rules, llm)
     return answer, row_id
 
 # runs the chat loop, which takes a question, retrieves documents, builds the system prompt with them, 
