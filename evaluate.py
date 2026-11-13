@@ -129,6 +129,7 @@ def main():
             "llm_flag": llm["flagged"], "llm_sev": llm["severity"],
             "llm_reason": f'{llm["kind"]}: {llm["reason"]}',
         }
+        # gives periodic updates on progress, since this can take a while if the label set is large
         r["outcome"] = outcome(r)
         results.append(r)
         if n % 10 == 0:
