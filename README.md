@@ -211,13 +211,3 @@ Model names change over time. If one is unavailable, edit `CHAT_MODEL` and `EMBE
 **Alerts (optional).** If `N8N_WEBHOOK_URL` and `N8N_WEBHOOK_TOKEN` aren't set, alerts are skipped with a message and everything else still works. To use them, run n8n locally and build the workflow shown above: a Webhook with header auth (`X-Alert-Token`), an Edit Fields step, a Google Sheets append to a `Tickets` tab, and an If node routing medium and high severity to Telegram. Put the production webhook URL and the token in `.env`.
 
 **Evaluation.** `export_labels.py` writes logged exchanges to CSV for labelling, and `evaluate.py` scores the detectors against your labels. The label files and results contain full answers, so they are git-ignored and my exact numbers can't be reproduced without my labels. To see the detectors as they were evaluated, check out the `detectors-v1` tag.
-
-## Screenshots
-
-![The chatbot answering a normal question](screenshots/01-baseline-chat.png)
-![The supplier question ladder leaking head office data](screenshots/02-supplier-leak.png)
-![The poisoned document appending a file list](screenshots/03-poisoned-document.png)
-![Evaluation summary](screenshots/04-evaluation-summary.png)
-![The n8n workflow](screenshots/05-n8n-workflow.png)
-![A Telegram alert](screenshots/06-telegram-alert.png)
-![The Tickets sheet](screenshots/07-tickets-tab.png)
