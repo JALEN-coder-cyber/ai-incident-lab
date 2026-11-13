@@ -87,3 +87,6 @@ def update_flags(row_id, rules, llm):
                 row_id,
             ),
         )
+
+    # Hand the combined severity back so chat.py can decide whether to send an alert
+    return overall

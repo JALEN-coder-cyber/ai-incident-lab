@@ -8,6 +8,8 @@ import chromadb
 # loads the API key from .env                 
 from dotenv import load_dotenv      
 from openai import OpenAI
+# this import is for logging every exchage in SQLite
+from alerts import send_alert
 
 # these imports are for logging every exchabge to SQLite and for running the two layers of detectors on each exchange
 from logger import init_db, log_exchange, update_flags
@@ -124,7 +126,12 @@ def answer_question(collection, session_id, history, question):
     # the user already has the answer by the time anything is flagged
     rules = detect_rules.check(question, answer)
     llm = detect_llm.check(question, answer)
-    update_flags(row_id, rules, llm)
+    severity = update_flags(row_id, rules, llm)
+
+    # Hand anything flagged to n8n for the ticket and alert. This runs after the answer
+    # has been produced, so it is monitoring and not prevention
+    if severity != "none" or llm["severity"] == "error":
+       send_alert(row_id, session_id, severity, rules, llm)
     return answer, row_id
 
 # runs the chat loop, which takes a question, retrieves documents, builds the system prompt with them, 
